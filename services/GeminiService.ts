@@ -8,7 +8,7 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 import { GEMINI_API_KEY } from '@env';
 import { NasaLesson, SanitizedLesson } from '../types/nasa';
 
-const MODEL_NAME = 'gemini-2.0-flash-exp'; // Latest experimental model - faster and better
+const MODEL_NAME = 'gemini-2.5-flash'; // Latest experimental model - faster and better
 const AI_TIMEOUT = 30000; // 30 seconds timeout
 const TEMPERATURE = 0.4; // Balanced temperature
 
