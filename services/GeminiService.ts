@@ -11,6 +11,7 @@ import { NasaLesson, SanitizedLesson } from '../types/nasa';
 const GEMINI_API_KEY = Constants.expoConfig?.extra?.GEMINI_API_KEY;
 
 const MODEL_NAME = 'gemini-2.5-flash'; // Latest experimental model - faster and better
+const FALLBACK_MODEL = 'gemini-2.0-flash-exp'; // Fallback model for 503 errors
 const AI_TIMEOUT = 30000; // 30 seconds timeout
 const TEMPERATURE = 0.4; // Balanced temperature
 
@@ -364,9 +365,53 @@ Now answer the user's question:`;
 
         console.log(`[GeminiService] ⏱️ ✅ TOTAL API TIME: ${Date.now() - totalStartTime}ms`);
         resolve(text);
-      } catch (error) {
+      } catch (error: any) {
         clearTimeout(timeoutId);
-        reject(error);
+        
+        // Check if it's a 503 error (model unavailable)
+        if (error?.status === 503 || error?.message?.includes('503') || error?.message?.includes('unavailable')) {
+          console.warn(`[GeminiService] ⚠️ Model ${MODEL_NAME} unavailable (503), switching to ${FALLBACK_MODEL}...`);
+          
+          try {
+            // Retry with fallback model
+            const fallbackModel = this.genAI.getGenerativeModel({ 
+              model: FALLBACK_MODEL,
+              generationConfig: {
+                temperature: TEMPERATURE,
+              },
+              safetySettings: [
+                {
+                  category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                  threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+                {
+                  category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                  threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+                {
+                  category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                  threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+                {
+                  category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                  threshold: HarmBlockThreshold.BLOCK_NONE,
+                },
+              ],
+            });
+            
+            const fallbackResult = await fallbackModel.generateContent(prompt);
+            const fallbackResponse = await fallbackResult.response;
+            const fallbackText = fallbackResponse.text();
+            
+            console.log(`[GeminiService] ✅ Successfully used fallback model ${FALLBACK_MODEL}`);
+            resolve(fallbackText);
+          } catch (fallbackError: any) {
+            console.error(`[GeminiService] ❌ Fallback model ${FALLBACK_MODEL} also failed:`, fallbackError.message);
+            reject(fallbackError);
+          }
+        } else {
+          reject(error);
+        }
       }
     });
   }
