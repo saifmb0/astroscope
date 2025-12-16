@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --space-dark: #0A0E27;
+  --space-cyan: #00D9FF;
+  --space-purple: #9D4EDD;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  .glass-effect {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10;
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-space-cyan to-space-purple;
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "astroscope-monorepo",
+  "version": "1.0.0",
+  "description": "AstroScope - AI-powered space exploration platform",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "mobile": "cd packages/mobile && npm start",
+    "web": "cd packages/web && npm run dev",
+    "mobile:install": "cd packages/mobile && npm install",
+    "web:install": "cd packages/web && npm install",
+    "install:all": "npm run mobile:install && npm run web:install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saifmb0/astroscope.git"
+  },
+  "keywords": [
+    "nasa",
+    "space",
+    "ai",
+    "astronomy",
+    "education",
+    "react-native",
+    "nextjs"
+  ],
+  "author": "saifmb0",
+  "license": "MIT"
+}
