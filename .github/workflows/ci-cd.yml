@@ -1,0 +1,222 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  # Test Mobile App
+  test-mobile:
+    name: Test Mobile App
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: packages/mobile/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: packages/mobile
+        run: npm ci
+      
+      - name: Check TypeScript
+        working-directory: packages/mobile
+        run: npx tsc --noEmit
+      
+      - name: Check for build errors
+        working-directory: packages/mobile
+        run: |
+          # Verify package.json exists and is valid
+          node -e "require('./package.json')"
+          echo "✅ Mobile package.json is valid"
+          
+          # Verify main entry point exists
+          if [ -f "index.ts" ]; then
+            echo "✅ Entry point (index.ts) exists"
+          else
+            echo "❌ Entry point (index.ts) missing"
+            exit 1
+          fi
+          
+          # Verify App.tsx exists
+          if [ -f "App.tsx" ]; then
+            echo "✅ App.tsx exists"
+          else
+            echo "❌ App.tsx missing"
+            exit 1
+          fi
+      
+      - name: Verify Expo configuration
+        working-directory: packages/mobile
+        run: |
+          if [ -f "app.json" ]; then
+            echo "✅ Expo app.json exists"
+          else
+            echo "❌ Expo app.json missing"
+            exit 1
+          fi
+
+  # Test Web App
+  test-web:
+    name: Test Web App
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: packages/web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: packages/web
+        run: npm ci
+      
+      - name: Check TypeScript
+        working-directory: packages/web
+        run: npx tsc --noEmit
+      
+      - name: Lint code
+        working-directory: packages/web
+        run: npm run lint
+        continue-on-error: true
+      
+      - name: Build web app
+        working-directory: packages/web
+        run: npm run build
+        env:
+          NEXT_PUBLIC_NASA_API_KEY: ${{ secrets.NASA_API_KEY || 'DEMO_KEY' }}
+      
+      - name: Verify build output
+        working-directory: packages/web
+        run: |
+          if [ -d ".next" ]; then
+            echo "✅ Next.js build output exists"
+            ls -la .next/
+          else
+            echo "❌ Next.js build failed"
+            exit 1
+          fi
+
+  # Validate Monorepo Structure
+  validate-structure:
+    name: Validate Monorepo Structure
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Validate monorepo structure
+        run: |
+          echo "=== Validating Monorepo Structure ==="
+          
+          # Check root package.json
+          if [ -f "package.json" ]; then
+            echo "✅ Root package.json exists"
+          else
+            echo "❌ Root package.json missing"
+            exit 1
+          fi
+          
+          # Check packages directory
+          if [ -d "packages" ]; then
+            echo "✅ packages/ directory exists"
+          else
+            echo "❌ packages/ directory missing"
+            exit 1
+          fi
+          
+          # Check mobile package
+          if [ -d "packages/mobile" ] && [ -f "packages/mobile/package.json" ]; then
+            echo "✅ Mobile package exists"
+          else
+            echo "❌ Mobile package missing or invalid"
+            exit 1
+          fi
+          
+          # Check web package
+          if [ -d "packages/web" ] && [ -f "packages/web/package.json" ]; then
+            echo "✅ Web package exists"
+          else
+            echo "❌ Web package missing or invalid"
+            exit 1
+          fi
+          
+          # Verify unique package names
+          mobile_name=$(node -pe "require('./packages/mobile/package.json').name")
+          web_name=$(node -pe "require('./packages/web/package.json').name")
+          
+          if [ "$mobile_name" = "$web_name" ]; then
+            echo "❌ Package names conflict: $mobile_name"
+            exit 1
+          else
+            echo "✅ Package names are unique:"
+            echo "   Mobile: $mobile_name"
+            echo "   Web: $web_name"
+          fi
+      
+      - name: Check documentation
+        run: |
+          if [ -f "README.md" ]; then
+            echo "✅ README.md exists"
+          else
+            echo "⚠️ README.md missing"
+          fi
+
+  # Deploy Web to Vercel (only on main/master push)
+  deploy-web:
+    name: Deploy Web App
+    needs: [test-web, validate-structure]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: packages/web
+
+  # Summary
+  summary:
+    name: CI/CD Summary
+    needs: [test-mobile, test-web, validate-structure]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Check results
+        run: |
+          echo "=== CI/CD Pipeline Summary ==="
+          echo "Mobile Tests: ${{ needs.test-mobile.result }}"
+          echo "Web Tests: ${{ needs.test-web.result }}"
+          echo "Structure Validation: ${{ needs.validate-structure.result }}"
+          
+          if [ "${{ needs.test-mobile.result }}" = "success" ] && \
+             [ "${{ needs.test-web.result }}" = "success" ] && \
+             [ "${{ needs.validate-structure.result }}" = "success" ]; then
+            echo "✅ All checks passed!"
+            exit 0
+          else
+            echo "❌ Some checks failed"
+            exit 1
+          fi
