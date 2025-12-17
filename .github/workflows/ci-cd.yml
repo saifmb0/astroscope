@@ -6,11 +6,17 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# Cancel in-progress runs when a new workflow is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Test Mobile App
   test-mobile:
     name: Test Mobile App
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     
     steps:
       - name: Checkout code
@@ -82,6 +88,7 @@ jobs:
   test-web:
     name: Test Web App
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     
     steps:
       - name: Checkout code
@@ -151,6 +158,7 @@ jobs:
   validate-structure:
     name: Validate Monorepo Structure
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     
     steps:
       - name: Checkout code
