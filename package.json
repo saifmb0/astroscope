@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "description": "AstroScope - AI-powered space exploration platform",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
     "mobile": "cd packages/mobile && npm start",
     "web": "cd packages/web && npm run dev",
