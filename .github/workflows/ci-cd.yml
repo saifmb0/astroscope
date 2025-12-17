@@ -226,12 +226,12 @@ jobs:
             echo "⚠️ README.md missing"
           fi
 
-  # Deploy Web to Vercel (only on main/master push)
+  # Deploy Web to Vercel (only on main/master push, and only if secrets are configured)
   deploy-web:
     name: Deploy Web App
     needs: [test-web, validate-structure]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && secrets.VERCEL_TOKEN != ''
     
     steps:
       - name: Checkout code
@@ -249,7 +249,7 @@ jobs:
   # Summary
   summary:
     name: CI/CD Summary
-    needs: [test-mobile, test-web, validate-structure]
+    needs: [test-mobile, test-web, validate-structure, deploy-web]
     runs-on: ubuntu-latest
     if: always()
     
@@ -260,11 +260,13 @@ jobs:
           echo "Mobile Tests: ${{ needs.test-mobile.result }}"
           echo "Web Tests: ${{ needs.test-web.result }}"
           echo "Structure Validation: ${{ needs.validate-structure.result }}"
+          echo "Web Deploy: ${{ needs.deploy-web.result }}"
           
+          # Deploy is optional (skipped if secrets not configured)
           if [ "${{ needs.test-mobile.result }}" = "success" ] && \
              [ "${{ needs.test-web.result }}" = "success" ] && \
              [ "${{ needs.validate-structure.result }}" = "success" ]; then
-            echo "✅ All checks passed!"
+            echo "✅ All required checks passed!"
             exit 0
           else
             echo "❌ Some checks failed"
